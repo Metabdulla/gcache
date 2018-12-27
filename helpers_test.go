@@ -95,3 +95,57 @@ func testGetALL(t *testing.T, evT string) {
 		t.Errorf("%v should contains key '%v'", m, size)
 	}
 }
+
+func TestAppend1(t *testing.T) {
+	var sli []int
+	for j := 1; j < 300000; j++ {
+		sli = append(sli, j)
+	}
+	start := time.Now()
+	for i := 0; i < len(sli); {
+		v := sli[i]
+		if v%3 == 0 {
+			//fmt.Println(v)
+			sli = append(sli[:i], sli[i+1:]...)
+			//fmt.Println(sli)
+		} else {
+			i++
+		}
+	}
+	//=== RUN   TestAppend1
+	//used time 23.945s 200000
+	//--- PASS: TestAppend1 (24.09s)
+	//PASS
+
+	//Process finished with exit code 0
+	fmt.Println("used time", time.Now().Sub(start), len(sli))
+
+}
+
+func TestAppend2(t *testing.T) {
+	start := time.Now()
+	var sli []int
+	for j := 1; j < 300000; j++ {
+		sli = append(sli, j)
+	}
+	var result []int
+	for i := 0; i < len(sli); i++ {
+		v := sli[i]
+		if v%3 == 0 {
+			//fmt.Println(v)
+
+			//fmt.Println(sli)
+		} else {
+			result = append(result, v)
+		}
+	}
+	sli = result
+	fmt.Println("used time", time.Now().Sub(start), len(result), len(sli))
+	//=== RUN   TestAppend2
+	//used time 25ms 200000 200000
+	//--- PASS: TestAppend2 (0.03s)
+	//PASS
+	//
+	//Process finished with exit code 0
+
+}

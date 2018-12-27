@@ -31,9 +31,11 @@ type call struct {
 // Group represents a class of work and forms a namespace in which
 // units of work can be executed with duplicate suppression.
 type Group struct {
-	cache Cache
-	mu    sync.Mutex            // protects m
-	m     map[interface{}]*call // lazily initialized
+	cache        Cache
+	ordered      bool
+	orderedCache OrderedCache
+	mu           sync.Mutex            // protects m
+	m            map[interface{}]*call // lazily initialized
 }
 
 // Do executes and returns the results of the given function, making
@@ -42,7 +44,14 @@ type Group struct {
 // original to complete and receives the same results.
 func (g *Group) Do(key interface{}, fn func() (interface{}, error), isWait bool) (interface{}, bool, error) {
 	g.mu.Lock()
-	v, err := g.cache.get(key, true)
+	var v interface{}
+	var err error
+	if g.cache == nil {
+		v, err = g.orderedCache.get(key, true)
+	} else {
+		v, err = g.cache.get(key, true)
+	}
+
 	if err == nil {
 		g.mu.Unlock()
 		return v, false, nil

@@ -12,12 +12,18 @@ const (
 	TYPE_LRU    = "lru"
 	TYPE_LFU    = "lfu"
 	TYPE_ARC    = "arc"
+
+	DefaultMaxSize = 100000
 )
 
-var KeyNotFoundError = errors.New("Key not found.")
+var KeyNotFoundError = errors.New("key not found ")
+var EmptyErr = errors.New("cache is empty")
+var ReachedMaxSizeErr = errors.New("reached max size")
 
+//supports an ordered and unordered  way , default is unordered
+//ordered cache just support simple cache in this version
 type Cache interface {
-	Set(interface{}, interface{}) error
+	Set(interface{}, interface{}) error //don't usu this in a ordered queue
 	SetWithExpire(interface{}, interface{}, time.Duration) error
 	Get(interface{}) (interface{}, error)
 	GetIFPresent(interface{}) (interface{}, error)
@@ -31,10 +37,34 @@ type Cache interface {
 	statsAccessor
 }
 
+type OrderedCache interface {
+	//for ordered (queues) cache,
+	EnQueue(interface{}, interface{}) error
+	EnQueueBatch([]interface{}, []interface{}) error
+	DeQueue() (interface{}, interface{}, error)
+	DeQueueBatch(count int) ([]interface{}, []interface{}, error)
+	OrderedKeys() []interface{}
+	MoveFront(interface{}) error               //move an element to front
+	GetTop() (interface{}, interface{}, error) //move an element to front
+	RemoveExpired(allowFailCount int) error
+	Get(interface{}) (interface{}, error)
+	GetIFPresent(interface{}) (interface{}, error)
+	GetALL() map[interface{}]interface{}
+	GetKeysAndValues() ([]interface{}, []interface{})
+	get(interface{}, bool) (interface{}, error)
+	Remove(interface{}) bool
+	Purge()
+	Refresh()
+	Keys() []interface{}
+	Len() int
+	statsAccessor
+}
+
 type baseCache struct {
 	clock            Clock
 	size             int
 	loaderExpireFunc LoaderExpireFunc
+	expireFunction   ExpiredFunction
 	evictedFunc      EvictedFunc
 	purgeVisitorFunc PurgeVisitorFunc
 	addedFunc        AddedFunc
@@ -54,6 +84,7 @@ type (
 	AddedFunc        func(interface{}, interface{})
 	DeserializeFunc  func(interface{}, interface{}) (interface{}, error)
 	SerializeFunc    func(interface{}, interface{}) (interface{}, error)
+	ExpiredFunction  func(interface{}) bool
 )
 
 type CacheBuilder struct {
@@ -67,8 +98,10 @@ type CacheBuilder struct {
 	expiration       *time.Duration
 	deserializeFunc  DeserializeFunc
 	serializeFunc    SerializeFunc
+	expireFunction   ExpiredFunction
 }
 
+// using ordered cache if orderedcache  is true
 func New(size int) *CacheBuilder {
 	return &CacheBuilder{
 		clock: NewRealClock(),
@@ -100,6 +133,10 @@ func (cb *CacheBuilder) LoaderExpireFunc(loaderExpireFunc LoaderExpireFunc) *Cac
 	return cb
 }
 
+func (cb *CacheBuilder) ExpiredFunc(expiredFunction ExpiredFunction) *CacheBuilder {
+	cb.expireFunction = expiredFunction
+	return cb
+}
 func (cb *CacheBuilder) EvictType(tp string) *CacheBuilder {
 	cb.tp = tp
 	return cb
@@ -159,6 +196,26 @@ func (cb *CacheBuilder) Build() Cache {
 	return cb.build()
 }
 
+func (cb *CacheBuilder) BuildOrderedCache() OrderedCache {
+	if cb.size <= 0 {
+		panic("gcache: Cache size <= 0")
+	}
+	cb.tp = TYPE_SIMPLE
+	return cb.buildOrderedCache()
+}
+
+func (cb *CacheBuilder) buildOrderedCache() OrderedCache {
+	//if cb.keyTypeFunction ==nil {
+	//panic("key types function is nil")
+	//}
+	switch cb.tp {
+	case TYPE_SIMPLE:
+		return newSimpleOrderedCache(cb)
+	default:
+		panic("gcache: Unknown type " + cb.tp)
+	}
+}
+
 func (cb *CacheBuilder) build() Cache {
 	switch cb.tp {
 	case TYPE_SIMPLE:
@@ -184,6 +241,7 @@ func buildCache(c *baseCache, cb *CacheBuilder) {
 	c.serializeFunc = cb.serializeFunc
 	c.evictedFunc = cb.evictedFunc
 	c.purgeVisitorFunc = cb.purgeVisitorFunc
+	c.expireFunction = cb.expireFunction
 	c.stats = &stats{}
 }
 
@@ -192,7 +250,7 @@ func (c *baseCache) load(key interface{}, cb func(interface{}, *time.Duration, e
 	v, called, err := c.loadGroup.Do(key, func() (v interface{}, e error) {
 		defer func() {
 			if r := recover(); r != nil {
-				e = fmt.Errorf("Loader panics: %v", r)
+				e = fmt.Errorf("loader panics: %v", r)
 			}
 		}()
 		return cb(c.loaderExpireFunc(key))

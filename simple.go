@@ -5,7 +5,8 @@ import "time"
 // SimpleCache has no clear priority for evict cache. It depends on key-value map order.
 type SimpleCache struct {
 	baseCache
-	items map[interface{}]*simpleItem
+	items       map[interface{}]*simpleItem
+	orderedKeys []interface{}
 }
 
 func newSimpleCache(cb *CacheBuilder) *SimpleCache {
@@ -64,6 +65,9 @@ func (c *SimpleCache) set(key, value interface{}) (interface{}, error) {
 		// Verify size not exceeded
 		if (len(c.items) >= c.size) && c.size > 0 {
 			c.evict(1)
+			if len(c.items) >= c.size {
+				return nil, ReachedMaxSizeErr
+			}
 		}
 		item = &simpleItem{
 			clock: c.clock,
@@ -258,6 +262,7 @@ type simpleItem struct {
 	clock      Clock
 	value      interface{}
 	expiration *time.Time
+	moved      bool
 }
 
 // returns boolean value whether this item is expired or not.
