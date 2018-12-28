@@ -16,15 +16,15 @@ func newtestSimploOrderCache() *SimpleOrderedCache {
 func TestSimpleOrderedCache_Remove(t *testing.T) {
 	c := newtestSimploOrderCache()
 	for i := 0; i < 1000; i++ {
-		c.EnQueUe(i, fmt.Sprintf("%d", i))
+		c.EnQueue(i, fmt.Sprintf("%d", i))
 	}
 	t.Log(c.Len(), c.orderedKeys)
-	index := []int{0}
-	c.removeKeysByIndex(index)
-	t.Log(c.Len(), c.orderedKeys)
+	//index := []int{0}
+	//c.removeKeysByIndex(index)
+	t.Log(len(c.orderedKeys), c.orderedKeys)
 	total := c.Len()
 	for i := 0; i < total; i++ {
-		c.DeQueUe()
+		c.DeQueue()
 	}
 	t.Log(c.Len(), c.orderedKeys)
 }
@@ -32,7 +32,7 @@ func TestSimpleOrderedCache_Remove(t *testing.T) {
 func TestSimpleOrderedCache_EnQueueBatch(t *testing.T) {
 	c := newtestSimploOrderCache()
 	for i := 0; i < 100; i++ {
-		c.EnQueUe(i, fmt.Sprintf("%d", i))
+		c.EnQueue(i, fmt.Sprintf("%d", i))
 	}
 	var keys []interface{}
 	var values []interface{}
@@ -45,10 +45,10 @@ func TestSimpleOrderedCache_EnQueueBatch(t *testing.T) {
 	t.Log(c.Len(), c.orderedKeys)
 	total := c.Len()
 	for i := 0; i < total/2; i++ {
-		c.DeQueUe()
+		c.DeQueue()
 	}
 	t.Log(c.Len(), c.orderedKeys)
-	keys, values, err := c.DeQueUeBatch(40)
+	keys, values, err := c.DeQueueBatch(40)
 	t.Log(len(keys), len(values), err)
 	t.Log(len(c.orderedKeys), c.orderedKeys)
 	var itemKeys []int
@@ -70,7 +70,31 @@ func TestRemoveByIndex(t *testing.T) {
 		index = append(index, i)
 	}
 	c.removeKeysByIndex(index)
-	if c.Len() != 0 {
+	if len(c.orderedKeys) != 0 {
 		t.Fatalf("need 0, got %d %v, %v", c.Len(), c.orderedKeys)
 	}
+}
+
+
+func TestSimpleOrderedCache_MoveFront(t *testing.T) {
+	c := newtestSimploOrderCache()
+	for i := 0; i < 100; i++ {
+		val:= fmt.Sprintf("I%d",i)
+		c.EnQueue(i,val)
+	}
+	err := c.MoveFront(1)
+	fmt.Println(err,c.orderedKeys)
+	err= c.MoveFront(10)
+	fmt.Println(err,c.orderedKeys)
+}
+
+func TestSimpleOrderedCache_GetKeysAndValues(t *testing.T) {
+	c := newtestSimploOrderCache()
+	for i := 0; i < 20; i++ {
+		val:= fmt.Sprintf("I%d",i)
+		c.EnQueue(i,val)
+	}
+	keys,values:= c.GetKeysAndValues()
+	fmt.Println(keys)
+	fmt.Println(values)
 }

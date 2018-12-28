@@ -149,3 +149,10 @@ func TestAppend2(t *testing.T) {
 	//Process finished with exit code 0
 
 }
+
+func TestMoveFront(t *testing.T) {
+	var arr =[]int {2,3,4,5,6,7,8,9}
+	fmt.Println(arr)
+	arr = append([]int{1},arr...)
+	fmt.Println(arr)
+}

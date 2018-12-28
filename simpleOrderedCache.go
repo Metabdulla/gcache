@@ -378,19 +378,31 @@ func (c *SimpleOrderedCache) OrderedKeys() []interface{} {
 }
 
 func (c *SimpleOrderedCache) moveFront(key interface{}) (err error) {
+	var try = 2
 	c.mu.Lock()
 	_, ok := c.items[key]
+	if !ok {
+		defer c.stats.IncrMissCount()
+	}
+	defer c.mu.Unlock()
 	if ok {
+		if len(c.orderedKeys) ==0 {
+			return EmptyErr
+		}
+		//if key is first two item ,don't move it
+		for i:=0;i<try && i< len( c.orderedKeys);i++ {
+			head :=c.orderedKeys[i]
+			if head == key {
+				return nil
+			}
+		}
 		if len(c.orderedKeys) >= c.size {
 			err = ReachedMaxSizeErr
 		}
-		c.orderedKeys = append(c.orderedKeys, key)
-		err = nil
-		c.mu.Unlock()
+		arr:= []interface{}{key}
+		c.orderedKeys = append(arr,c.orderedKeys...)
 		return err
 	}
-	c.mu.Unlock()
-	c.stats.IncrMissCount()
 	return KeyNotFoundError
 }
 
