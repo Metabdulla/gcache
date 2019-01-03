@@ -648,14 +648,14 @@ func (c *SimpleOrderedCache) EnQueueBatch(keys []interface{}, values []interface
 	return c.enQueueBatch(keys, values)
 }
 
-func (c *SimpleOrderedCache) AddFrontBatch(keys []interface{}, values []interface{}) error {
+func (c *SimpleOrderedCache) PrependBatch(keys []interface{}, values []interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.addFrontBatch(keys, values)
 }
 
 
-func ( c*SimpleOrderedCache)AddFront(key interface{}, value interface{}) error {
+func ( c*SimpleOrderedCache)Prepend(key interface{}, value interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	_, err := c.addFront(key, value)

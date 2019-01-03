@@ -1,6 +1,7 @@
 package gcache
 
 import (
+	"container/list"
 	"fmt"
 	"testing"
 	"time"
@@ -155,4 +156,44 @@ func TestMoveFront(t *testing.T) {
 	fmt.Println(arr)
 	arr = append([]int{1},arr...)
 	fmt.Println(arr)
+}
+
+func TestSliceInsert(t *testing.T) {
+	var arr []string
+	start := time.Now()
+	for i:=3;i <10000000; i++ {
+		arr = append(arr,fmt.Sprintf("i%di",i))
+	}
+	fmt.Println("use time", time.Now().Sub(start),len(arr))
+	start = time.Now()
+	arr = append(arr,"10")
+	fmt.Println("use time", time.Now().Sub(start),len(arr))
+	start = time.Now()
+	arr = append([]string{"00"},arr...)
+	fmt.Println("use time", time.Now().Sub(start),len(arr))
+	start = time.Now()
+	arrCopy := make([]string,len(arr)+1)
+	arrCopy[0]="11"
+	copy(arrCopy[1:],arr)
+	arr = arrCopy
+	fmt.Println("use time", time.Now().Sub(start),len(arr))
+}
+
+func TestListInsert(t *testing.T) {
+	l:= list.New()
+	start := time.Now()
+	for i:=3;i <10000000; i++ {
+		//arr = append(arr,fmt.Sprintf("i%di",i))
+		l.PushBack(fmt.Sprintf("i%di",i))
+	}
+	fmt.Println("use time", time.Now().Sub(start),l.Len())
+	start = time.Now()
+	l.PushBack("10")
+	fr:=  l.Front()
+	fmt.Println("use time", time.Now().Sub(start),l.Len(),"front",fr)
+	start = time.Now()
+	f := l.Front()
+	l.InsertBefore("11",f)
+	fr =  l.Front()
+	fmt.Println("use time", time.Now().Sub(start),l.Len(),"front ",fr)
 }

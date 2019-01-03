@@ -105,7 +105,7 @@ func TestSimpleOrderedCache_AddFront(t *testing.T) {
 		val:= fmt.Sprintf("I%d",i)
 		c.EnQueue(i,val)
 	}
-	c.AddFront(25,"i25")
+	c.Prepend(25,"i25")
 	keys,values:= c.GetKeysAndValues()
 	fmt.Println(keys)
 	fmt.Println(values)
@@ -117,7 +117,7 @@ func TestSimpleOrderedCache_AddFrontBatch(t *testing.T) {
 		val:= fmt.Sprintf("I%d",i)
 		c.EnQueue(i,val)
 	}
-	c.AddFrontBatch([]interface{}{30,31,32,33},[]interface{}{"30","31","32","33"})
+	c.PrependBatch([]interface{}{30,31,32,33},[]interface{}{"30","31","32","33"})
 	keys,values:= c.GetKeysAndValues()
 	fmt.Println(keys)
 	fmt.Println(values)

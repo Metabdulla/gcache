@@ -46,8 +46,8 @@ type OrderedCache interface {
 	OrderedKeys() []interface{}
 	MoveFront(interface{}) error               //move an element to front
 	GetTop() (interface{}, interface{}, error) //get top element
-	AddFront(interface{}, interface{}) error
-	AddFrontBatch([]interface{}, []interface{}) error
+	Prepend(interface{}, interface{}) error
+	PrependBatch([]interface{}, []interface{}) error
 	RemoveExpired(allowFailCount int) error
 	Get(interface{}) (interface{}, error)
 	GetIFPresent(interface{}) (interface{}, error)
