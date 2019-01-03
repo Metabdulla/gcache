@@ -30,6 +30,47 @@ func (c *SimpleOrderedCache) init() {
 	c.orderedKeys = nil
 }
 
+func (c *SimpleOrderedCache) addFront(key, value interface{}) (interface{}, error) {
+	var err error
+	if c.serializeFunc != nil {
+		value, err = c.serializeFunc(key, value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Check for existing item
+	item, ok := c.items[key]
+	if ok {
+		item.value = value
+	} else {
+		// Verify size not exceeded
+		if (len(c.items) >= c.size) && c.size > 0 {
+			c.evict(1)
+			if len(c.items) >= c.size {
+				return nil, ReachedMaxSizeErr
+			}
+		}
+		item = &simpleItem{
+			clock: c.clock,
+			value: value,
+		}
+		c.items[key] = item
+		c.orderedKeys = append([]interface{}{key}, c.orderedKeys...)
+	}
+
+	if c.expiration != nil {
+		t := c.clock.Now().Add(*c.expiration)
+		item.expiration = &t
+	}
+
+	if c.addedFunc != nil {
+		c.addedFunc(key, value)
+	}
+
+	return item, nil
+}
+
 func (c *SimpleOrderedCache) enQueue(key, value interface{}) (interface{}, error) {
 	var err error
 	if c.serializeFunc != nil {
@@ -118,6 +159,58 @@ func (c *SimpleOrderedCache) enQueueBatch(keys []interface{}, values []interface
 			c.addedFunc(key, value)
 		}
 	}
+	return nil
+}
+
+func (c *SimpleOrderedCache) addFrontBatch(keys []interface{}, values []interface{}) error {
+	if len(values) != len(keys) {
+		panic("len(keys) != len(values)")
+	}
+	evicted := false
+	var insertKeys  []interface{}
+	for i, key := range keys {
+		value := values[i]
+		var err error
+		if c.serializeFunc != nil {
+			value, err = c.serializeFunc(key, value)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Check for existing item
+		item, ok := c.items[key]
+		if ok {
+			item.value = value
+		} else {
+			// Verify size not exceeded
+			if (len(c.items) >= c.size) && c.size > 0 {
+				if !evicted {
+					c.evict(len(keys) - i)
+					evicted = true
+				}
+				if len(c.items) >= c.size {
+					return ReachedMaxSizeErr
+				}
+			}
+			item = &simpleItem{
+				clock: c.clock,
+				value: value,
+			}
+			c.items[key] = item
+			insertKeys= append(insertKeys,key)
+		}
+
+		if c.expiration != nil {
+			t := c.clock.Now().Add(*c.expiration)
+			item.expiration = &t
+		}
+
+		if c.addedFunc != nil {
+			c.addedFunc(key, value)
+		}
+	}
+	c.orderedKeys = append(insertKeys, c.orderedKeys...,)
 	return nil
 }
 
@@ -553,6 +646,20 @@ func (c *SimpleOrderedCache) EnQueueBatch(keys []interface{}, values []interface
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.enQueueBatch(keys, values)
+}
+
+func (c *SimpleOrderedCache) AddFrontBatch(keys []interface{}, values []interface{}) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.addFrontBatch(keys, values)
+}
+
+
+func ( c*SimpleOrderedCache)AddFront(key interface{}, value interface{}) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	_, err := c.addFront(key, value)
+	return err
 }
 
 func (c *SimpleOrderedCache) RemoveExpired(allowFailCount int) error {

@@ -98,3 +98,27 @@ func TestSimpleOrderedCache_GetKeysAndValues(t *testing.T) {
 	fmt.Println(keys)
 	fmt.Println(values)
 }
+
+func TestSimpleOrderedCache_AddFront(t *testing.T) {
+	c := newtestSimploOrderCache()
+	for i := 0; i < 20; i++ {
+		val:= fmt.Sprintf("I%d",i)
+		c.EnQueue(i,val)
+	}
+	c.AddFront(25,"i25")
+	keys,values:= c.GetKeysAndValues()
+	fmt.Println(keys)
+	fmt.Println(values)
+}
+
+func TestSimpleOrderedCache_AddFrontBatch(t *testing.T) {
+	c := newtestSimploOrderCache()
+	for i := 0; i < 20; i++ {
+		val:= fmt.Sprintf("I%d",i)
+		c.EnQueue(i,val)
+	}
+	c.AddFrontBatch([]interface{}{30,31,32,33},[]interface{}{"30","31","32","33"})
+	keys,values:= c.GetKeysAndValues()
+	fmt.Println(keys)
+	fmt.Println(values)
+}
