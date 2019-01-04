@@ -587,7 +587,6 @@ func (c *SimpleOrderedCache) deQueueBatch(count int) (keys []interface{}, values
 		removedIndex = append(removedIndex, i)
 		c.remove(key)
 	}
-	fmt.Println(removedIndex)
 	if all {
 		c.init()
 	} else {
