@@ -167,7 +167,7 @@ func (c *SimpleOrderedCache) addFrontBatch(keys []interface{}, values []interfac
 		panic("len(keys) != len(values)")
 	}
 	evicted := false
-	var insertKeys  []interface{}
+	var insertKeys []interface{}
 	for i, key := range keys {
 		value := values[i]
 		var err error
@@ -198,7 +198,7 @@ func (c *SimpleOrderedCache) addFrontBatch(keys []interface{}, values []interfac
 				value: value,
 			}
 			c.items[key] = item
-			insertKeys= append(insertKeys,key)
+			insertKeys = append(insertKeys, key)
 		}
 
 		if c.expiration != nil {
@@ -210,7 +210,7 @@ func (c *SimpleOrderedCache) addFrontBatch(keys []interface{}, values []interfac
 			c.addedFunc(key, value)
 		}
 	}
-	c.orderedKeys = append(insertKeys, c.orderedKeys...,)
+	c.orderedKeys = append(insertKeys, c.orderedKeys...)
 	return nil
 }
 
@@ -479,12 +479,12 @@ func (c *SimpleOrderedCache) moveFront(key interface{}) (err error) {
 	}
 	defer c.mu.Unlock()
 	if ok {
-		if len(c.orderedKeys) ==0 {
+		if len(c.orderedKeys) == 0 {
 			return EmptyErr
 		}
 		//if key is first two item ,don't move it
-		for i:=0;i<try && i< len( c.orderedKeys);i++ {
-			head :=c.orderedKeys[i]
+		for i := 0; i < try && i < len(c.orderedKeys); i++ {
+			head := c.orderedKeys[i]
 			if head == key {
 				return nil
 			}
@@ -492,8 +492,8 @@ func (c *SimpleOrderedCache) moveFront(key interface{}) (err error) {
 		if len(c.orderedKeys) >= c.size {
 			err = ReachedMaxSizeErr
 		}
-		arr:= []interface{}{key}
-		c.orderedKeys = append(arr,c.orderedKeys...)
+		arr := []interface{}{key}
+		c.orderedKeys = append(arr, c.orderedKeys...)
 		return err
 	}
 	return KeyNotFoundError
@@ -653,8 +653,7 @@ func (c *SimpleOrderedCache) PrependBatch(keys []interface{}, values []interface
 	return c.addFrontBatch(keys, values)
 }
 
-
-func ( c*SimpleOrderedCache)Prepend(key interface{}, value interface{}) error {
+func (c *SimpleOrderedCache) Prepend(key interface{}, value interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	_, err := c.addFront(key, value)
@@ -665,6 +664,30 @@ func (c *SimpleOrderedCache) RemoveExpired(allowFailCount int) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.removeExpired(allowFailCount)
+}
+
+func (c *SimpleOrderedCache) Sort() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	getItem := func(key interface{}) (value interface{}, ok bool) {
+		item, ok := c.items[key]
+		if ok {
+			value = item.value
+			if item.IsExpired(nil) {
+				c.remove(key)
+			}
+		}
+		return value, ok
+	}
+	var values []interface{}
+	for key, item := range c.items {
+		if item.IsExpired(nil) {
+			c.remove(key)
+		}
+		values = append(values, item.value)
+	}
+	keys, _ := c.sortKeysFunc(c.orderedKeys, values, getItem)
+	c.orderedKeys = keys
 }
 
 func (c *SimpleOrderedCache) removeExpired(allowFailCount int) error {

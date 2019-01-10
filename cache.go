@@ -59,6 +59,7 @@ type OrderedCache interface {
 	Refresh()
 	Keys() []interface{}
 	Len() int
+	Sort()
 	statsAccessor
 }
 
@@ -75,6 +76,7 @@ type baseCache struct {
 	expiration       *time.Duration
 	mu               sync.RWMutex
 	loadGroup        Group
+	sortKeysFunc	SortKeysFunction
 	*stats
 }
 
@@ -87,6 +89,7 @@ type (
 	DeserializeFunc  func(interface{}, interface{}) (interface{}, error)
 	SerializeFunc    func(interface{}, interface{}) (interface{}, error)
 	ExpiredFunction  func(interface{}) bool
+	SortKeysFunction func ([]interface{}, []interface{} , func (interface{}) (interface{}, bool))([]interface{}, bool)
 )
 
 type CacheBuilder struct {
@@ -101,6 +104,7 @@ type CacheBuilder struct {
 	deserializeFunc  DeserializeFunc
 	serializeFunc    SerializeFunc
 	expireFunction   ExpiredFunction
+	sortKeysFunction  SortKeysFunction
 }
 
 // using ordered cache if orderedcache  is true
@@ -185,6 +189,12 @@ func (cb *CacheBuilder) SerializeFunc(serializeFunc SerializeFunc) *CacheBuilder
 	return cb
 }
 
+
+func (cb *CacheBuilder) SortKeysFunc(sortKeysFunction SortKeysFunction) *CacheBuilder {
+	cb.sortKeysFunction = sortKeysFunction
+	return cb
+}
+
 func (cb *CacheBuilder) Expiration(expiration time.Duration) *CacheBuilder {
 	cb.expiration = &expiration
 	return cb
@@ -244,6 +254,7 @@ func buildCache(c *baseCache, cb *CacheBuilder) {
 	c.evictedFunc = cb.evictedFunc
 	c.purgeVisitorFunc = cb.purgeVisitorFunc
 	c.expireFunction = cb.expireFunction
+	c.sortKeysFunc = cb.sortKeysFunction
 	c.stats = &stats{}
 }
 
