@@ -40,14 +40,14 @@ type Cache interface {
 type OrderedCache interface {
 	//for ordered (queues) cache,
 	EnQueue(interface{}, interface{}) error
-	EnQueueBatch([]interface{}, []interface{}) error
+	EnQueueBatch([]interface{}, []interface{}) error //EnQueueBatch if searchFunc is not nil , keys are  required sorted
 	DeQueue() (interface{}, interface{}, error)
 	DeQueueBatch(count int) ([]interface{}, []interface{}, error)
 	OrderedKeys() []interface{}
 	MoveFront(interface{}) error               //move an element to front
 	GetTop() (interface{}, interface{}, error) //get top element
 	Prepend(interface{}, interface{}) error
-	PrependBatch([]interface{}, []interface{}) error
+	PrependBatch([]interface{}, []interface{}) error //PrependBatch if searchFunc is not nil , keys are  required sorted
 	RemoveExpired(allowFailCount int) error
 	Get(interface{}) (interface{}, error)
 	GetIFPresent(interface{}) (interface{}, error)
@@ -77,6 +77,7 @@ type baseCache struct {
 	mu               sync.RWMutex
 	loadGroup        Group
 	sortKeysFunc	SortKeysFunction
+	searchFunc       SearchCompareFunction
 	*stats
 }
 
@@ -90,6 +91,7 @@ type (
 	SerializeFunc    func(interface{}, interface{}) (interface{}, error)
 	ExpiredFunction  func(interface{}) bool
 	SortKeysFunction func ([]interface{}, []interface{} , func (interface{}) (interface{}, bool))([]interface{}, bool)
+	SearchCompareFunction   func (value interface{} ,anotherValue interface{} )(int)
 )
 
 type CacheBuilder struct {
@@ -105,6 +107,7 @@ type CacheBuilder struct {
 	serializeFunc    SerializeFunc
 	expireFunction   ExpiredFunction
 	sortKeysFunction  SortKeysFunction
+	searchFunc        SearchCompareFunction
 }
 
 // using ordered cache if orderedcache  is true
@@ -195,6 +198,12 @@ func (cb *CacheBuilder) SortKeysFunc(sortKeysFunction SortKeysFunction) *CacheBu
 	return cb
 }
 
+
+func (cb *CacheBuilder) SearchFunc( searchFunction  SearchCompareFunction) *CacheBuilder {
+	cb.searchFunc = searchFunction
+	return cb
+}
+
 func (cb *CacheBuilder) Expiration(expiration time.Duration) *CacheBuilder {
 	cb.expiration = &expiration
 	return cb
@@ -255,6 +264,7 @@ func buildCache(c *baseCache, cb *CacheBuilder) {
 	c.purgeVisitorFunc = cb.purgeVisitorFunc
 	c.expireFunction = cb.expireFunction
 	c.sortKeysFunc = cb.sortKeysFunction
+	c.searchFunc =  cb.searchFunc
 	c.stats = &stats{}
 }
 

@@ -42,7 +42,12 @@ func (c *SimpleOrderedCache) addFront(key, value interface{}) (interface{}, erro
 	// Check for existing item
 	item, ok := c.items[key]
 	if ok {
-		item.value = value
+		if c.searchFunc == nil {
+			item.value = value
+		} else {
+			//don't set again ,if using ordered insert
+			return item, fmt.Errorf("duplicated set")
+		}
 	} else {
 		// Verify size not exceeded
 		if (len(c.items) >= c.size) && c.size > 0 {
@@ -56,7 +61,11 @@ func (c *SimpleOrderedCache) addFront(key, value interface{}) (interface{}, erro
 			value: value,
 		}
 		c.items[key] = item
-		c.orderedKeys = append([]interface{}{key}, c.orderedKeys...)
+		if c.searchFunc != nil {
+			c.insertKey(key, value, 0)
+		} else {
+			c.orderedKeys = append([]interface{}{key}, c.orderedKeys...)
+		}
 	}
 
 	if c.expiration != nil {
@@ -83,7 +92,13 @@ func (c *SimpleOrderedCache) enQueue(key, value interface{}) (interface{}, error
 	// Check for existing item
 	item, ok := c.items[key]
 	if ok {
-		item.value = value
+		if c.searchFunc == nil {
+			item.value = value
+		} else {
+			//don't set again ,if using ordered insert
+			return item, fmt.Errorf("duplicated set")
+		}
+
 	} else {
 		// Verify size not exceeded
 		if (len(c.items) >= c.size) && c.size > 0 {
@@ -97,7 +112,11 @@ func (c *SimpleOrderedCache) enQueue(key, value interface{}) (interface{}, error
 			value: value,
 		}
 		c.items[key] = item
-		c.orderedKeys = append(c.orderedKeys, key)
+		if c.searchFunc != nil {
+			c.insertKey(key, value, len(c.orderedKeys))
+		} else {
+			c.orderedKeys = append(c.orderedKeys, key)
+		}
 	}
 
 	if c.expiration != nil {
@@ -117,6 +136,8 @@ func (c *SimpleOrderedCache) enQueueBatch(keys []interface{}, values []interface
 		panic("len(keys) != len(values)")
 	}
 	evicted := false
+	var insertKeys []interface{}
+	var insertValues []interface{}
 	for i, key := range keys {
 		value := values[i]
 		var err error
@@ -130,7 +151,11 @@ func (c *SimpleOrderedCache) enQueueBatch(keys []interface{}, values []interface
 		// Check for existing item
 		item, ok := c.items[key]
 		if ok {
-			item.value = value
+			if c.searchFunc == nil {
+				item.value = value
+			} else {
+				//don't set again ,if using ordered insert
+			}
 		} else {
 			// Verify size not exceeded
 			if (len(c.items) >= c.size) && c.size > 0 {
@@ -147,7 +172,12 @@ func (c *SimpleOrderedCache) enQueueBatch(keys []interface{}, values []interface
 				value: value,
 			}
 			c.items[key] = item
-			c.orderedKeys = append(c.orderedKeys, key)
+			if c.searchFunc != nil {
+				insertKeys = append(insertKeys, key)
+				insertValues = append(insertValues, value)
+			} else {
+				c.orderedKeys = append(c.orderedKeys, key)
+			}
 		}
 
 		if c.expiration != nil {
@@ -159,7 +189,180 @@ func (c *SimpleOrderedCache) enQueueBatch(keys []interface{}, values []interface
 			c.addedFunc(key, value)
 		}
 	}
+	if c.searchFunc != nil {
+		c.insertKeys(insertKeys, insertValues, len(c.orderedKeys))
+	}
 	return nil
+}
+
+//insertKeys  required  keys and values are sorted , otherwise never call this function
+func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}, suggestedAt int) {
+	if c.searchFunc == nil {
+		panic("index func is nil")
+	}
+	if suggestedAt < 0 || suggestedAt > len(c.orderedKeys) || len(keys) != len(values) {
+		panic(fmt.Sprintf("suggestedAt %d out of range ,len: %d, len keys %d, len values:%d",
+			suggestedAt, len(c.orderedKeys), len(keys), len(values)))
+	}
+	fmt.Println(c.orderedKeys, "here")
+	if len(c.orderedKeys) == 0 {
+		c.orderedKeys = keys
+		return
+	}
+	if len(keys) == 1 {
+		c.insertKey(keys[0], values[0], suggestedAt)
+		return
+	}
+	// if all item are smaller than first cache item, insert all of them to front
+	first := 0
+	ok := false
+	for !ok {
+		k := c.orderedKeys[first]
+		item, ok := c.items[k]
+		if ok {
+			if c.searchFunc(values[len(values)-1], item.value) <= 0 {
+				newKeys := keys
+				c.orderedKeys = append(newKeys, c.orderedKeys[first:]...)
+				fmt.Println(c.orderedKeys, "aaa")
+				return
+			}
+			break
+		}
+		first++
+		if first == len(c.orderedKeys) {
+			c.orderedKeys = keys
+			fmt.Println(c.orderedKeys, "here2")
+			return
+		}
+	}
+	//if all item are bigger than last item ,insert all of them to end
+	last := len(c.orderedKeys) - 1
+	ok = false
+	for !ok {
+		k := c.orderedKeys[last]
+		item, ok := c.items[k]
+		if ok {
+			if c.searchFunc(values[0], item.value) >= 0 {
+				if last != len(c.orderedKeys)-1 {
+					c.orderedKeys = append(c.orderedKeys[:last+1])
+				}
+				c.orderedKeys = append(c.orderedKeys, keys...)
+				fmt.Println(c.orderedKeys, "hihi")
+				return
+			}
+			break
+		}
+		last--
+		if first == len(c.orderedKeys) {
+			c.orderedKeys = keys
+			fmt.Println(c.orderedKeys, "here21")
+			return
+		}
+	}
+	//other
+	def := func(val interface{}) func(i int) bool {
+		f := func(i int) bool {
+			if i == len(c.orderedKeys) {
+				return true
+			}
+			k1 := c.orderedKeys[i]
+			item1, ok := c.items[k1]
+			if ok {
+				if c.searchFunc(item1.value, val) >= 0 {
+					return true
+				}
+			}
+			return false
+		}
+		return f
+	}
+	//batch search a small sorted slice from a large sorted slice
+	to := len(c.orderedKeys)
+	from := 0
+	insertIndex := make([]int, len(keys))
+	i := 0
+	j := len(keys) - 1
+	for i <= j {
+		samllValue := values[i]
+		smallIndex := SearchFrom(to, from, def(samllValue))
+		insertIndex[i] = smallIndex
+		from = smallIndex
+		bigValue := values[j]
+		if c.searchFunc(samllValue, bigValue) == 0 {
+			for i <= j {
+				insertIndex[j] = smallIndex
+				insertIndex[i] = smallIndex
+				j--
+				i++
+			}
+		}
+		bigIndex := SearchFrom(to, from, def(bigValue))
+		to = bigIndex + 1
+		insertIndex[j] = bigIndex
+		j--
+		i++
+	}
+	fmt.Println(c.orderedKeys, "222", insertIndex)
+	//then insert the values
+	c.insertKeysByIndex(insertIndex, keys)
+	return
+}
+
+func (c *SimpleOrderedCache) insertKey(key interface{}, value interface{}, suggestedAt int) {
+	//defer fmt.Println(c.orderedKeys ,key,value,suggestedAt)
+	if c.searchFunc == nil {
+		panic("serach func is nil")
+	}
+	if len(c.orderedKeys) == 0 {
+		c.orderedKeys = append(c.orderedKeys, key)
+		return
+	}
+	if suggestedAt < 0 || suggestedAt > len(c.orderedKeys) {
+		panic(fmt.Sprintf("suggestedAt %d out of range ,len: %d", suggestedAt, len(c.orderedKeys)))
+	}
+	//suggested index just support front and end
+	if suggestedAt == len(c.orderedKeys) {
+		suggestedAt--
+		k := c.orderedKeys[suggestedAt]
+		item, ok := c.items[k]
+		if ok {
+			val := item.value
+			//suggested at insert front
+			if c.searchFunc(value, val) >= 0 {
+				c.orderedKeys = append(c.orderedKeys, key)
+				return
+			}
+		}
+	} else if suggestedAt == 0 {
+		k := c.orderedKeys[suggestedAt]
+		item, ok := c.items[k]
+		if ok {
+			val := item.value
+			//suggested at insert front
+			if c.searchFunc(value, val) <= 0 {
+				c.orderedKeys = append([]interface{}{key}, c.orderedKeys...)
+				return
+			}
+		}
+	} else {
+		//todo
+	}
+
+	f := func(i int) bool {
+		k1 := c.orderedKeys[i]
+		item1, ok := c.items[k1]
+		if ok {
+			if c.searchFunc(item1.value, value) >= 0 {
+				return true
+			}
+		}
+		return false
+	}
+	i := Search(len(c.orderedKeys), f)
+	//fmt.Println(i)
+	c.orderedKeys = SliceInsert(c.orderedKeys, i, key)
+	//fmt.Println(c.orderedKeys)
+	return
 }
 
 func (c *SimpleOrderedCache) addFrontBatch(keys []interface{}, values []interface{}) error {
@@ -168,6 +371,7 @@ func (c *SimpleOrderedCache) addFrontBatch(keys []interface{}, values []interfac
 	}
 	evicted := false
 	var insertKeys []interface{}
+	var insertValues []interface{}
 	for i, key := range keys {
 		value := values[i]
 		var err error
@@ -181,7 +385,11 @@ func (c *SimpleOrderedCache) addFrontBatch(keys []interface{}, values []interfac
 		// Check for existing item
 		item, ok := c.items[key]
 		if ok {
-			item.value = value
+			if c.searchFunc == nil {
+				item.value = value
+			} else {
+				//don't set again ,if using ordered insert
+			}
 		} else {
 			// Verify size not exceeded
 			if (len(c.items) >= c.size) && c.size > 0 {
@@ -199,6 +407,10 @@ func (c *SimpleOrderedCache) addFrontBatch(keys []interface{}, values []interfac
 			}
 			c.items[key] = item
 			insertKeys = append(insertKeys, key)
+			if c.searchFunc != nil {
+				insertValues = append(insertValues, value)
+			}
+
 		}
 
 		if c.expiration != nil {
@@ -210,7 +422,11 @@ func (c *SimpleOrderedCache) addFrontBatch(keys []interface{}, values []interfac
 			c.addedFunc(key, value)
 		}
 	}
-	c.orderedKeys = append(insertKeys, c.orderedKeys...)
+	if c.searchFunc != nil {
+		c.insertKeys(insertKeys, insertValues, 0)
+	} else {
+		c.orderedKeys = append(insertKeys, c.orderedKeys...)
+	}
 	return nil
 }
 
@@ -324,21 +540,57 @@ func (c *SimpleOrderedCache) evict(count int) {
 
 }
 
-//removeKeysByIndex
-//[][][][][remove][remove][]
-func (c *SimpleOrderedCache) removeKeysByIndex(Index []int) {
-	if len(Index) == 0 {
+//insert a small slice into a big slice with order
+func (c *SimpleOrderedCache) insertKeysByIndex(indexes []int, keys []interface{}) {
+	if len(indexes) == 0 {
 		return
 	}
-	if len(Index) > len(c.orderedKeys) {
+	if len(indexes) != len(keys) {
+		panic("length mismatch")
+	}
+	if len(c.orderedKeys) == 0 {
+		c.orderedKeys = keys
+		return
+	}
+	var result []interface{}
+	first := 0
+	for i, second := range indexes {
+		if first > second {
+			panic(fmt.Sprintf("must be sorted %d %d %v", first, second, indexes))
+		}
+		if second >= len(c.orderedKeys) {
+			result = append(result, c.orderedKeys[first:]...)
+			c.orderedKeys = append(result, keys[i:]...)
+			return
+		}
+		if first == second {
+			result = append(result, keys[i])
+		} else {
+			result = append(result, c.orderedKeys[first:second]...)
+			result = append(result, keys[i])
+		}
+		first = second
+	}
+	result = append(result, c.orderedKeys[first:]...)
+	c.orderedKeys = result
+	return
+}
+
+//removeKeysByIndex
+//[][][][][remove][remove][]
+func (c *SimpleOrderedCache) removeKeysByIndex(indexes []int) {
+	if len(indexes) == 0 {
+		return
+	}
+	if len(indexes) > len(c.orderedKeys) {
 		panic("all elements will be removed")
 	}
 	oldKeys := c.orderedKeys
-	start := Index[0]
-	end := Index[len(Index)-1]
+	start := indexes[0]
+	end := indexes[len(indexes)-1]
 	c.orderedKeys = oldKeys[:start]
 	first := start
-	for i, second := range Index {
+	for i, second := range indexes {
 		//just process [][][][][remove][][remove][]
 		if i == 0 {
 			continue
@@ -359,7 +611,61 @@ func (c *SimpleOrderedCache) removeKeysByIndex(Index []int) {
 func (c *SimpleOrderedCache) Remove(key interface{}) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	item, _ := c.items[key]
 	ok := c.remove(key)
+	if ok {
+		if c.searchFunc != nil {
+			var found bool
+			f := func(i int) bool {
+				k1 := c.orderedKeys[i]
+				item1, ok := c.items[k1]
+				if ok {
+					if c.searchFunc(item1.value, item.value) >= 0 {
+						return true
+					}
+				}
+				return false
+			}
+			i := Search(len(c.orderedKeys), f)
+			j := i
+			for ; j < len(c.orderedKeys); j++ {
+				if c.orderedKeys[j] == key {
+					c.orderedKeys = append(c.orderedKeys[:j], c.orderedKeys[j+1:]...)
+					found = true
+					break
+				}
+				itemJ, ok := c.items[c.orderedKeys[j]]
+				if ok {
+					if c.searchFunc(itemJ.value, item.value) > 0 {
+						break
+					}
+				}
+			}
+			if found && DebugMode {
+				fmt.Println("found key at index i , the key is  ", i, c.orderedKeys[i], j, c.orderedKeys[j])
+			} else if !found && DebugMode {
+				if j >= len(c.orderedKeys) {
+					fmt.Println("not found key")
+				} else {
+					fmt.Println("not found key at index i , the key is  ", i, c.orderedKeys[i], j, c.orderedKeys[j])
+				}
+			}
+
+		} else {
+			j := 0
+			for i, k := range c.orderedKeys {
+				if k == key {
+					c.orderedKeys = append(c.orderedKeys[:i], c.orderedKeys[i+1:]...)
+					break
+				}
+				j= i
+			}
+			if DebugMode {
+				fmt.Println("cmp times ", j)
+			}
+		}
+	}
+
 	if len(c.items) == 0 {
 		c.orderedKeys = nil
 	} else if len(c.items) == 1 {
@@ -519,7 +825,6 @@ func (c *SimpleOrderedCache) getALl() (keys []interface{}, values []interface{})
 				keys = append(keys, key)
 				//c.stats.IncrHitCount()
 			} else {
-				//todo remove ordered key
 				index = append(index, i)
 				c.remove(key)
 			}
@@ -641,6 +946,7 @@ func (c *SimpleOrderedCache) EnQueue(key interface{}, value interface{}) error {
 	return err
 }
 
+//EnQueueBatch if searchFunc is not nil , keys are  required sorted
 func (c *SimpleOrderedCache) EnQueueBatch(keys []interface{}, values []interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -673,9 +979,9 @@ func (c *SimpleOrderedCache) Sort() {
 		item, ok := c.items[key]
 		if ok {
 			value = item.value
-			if item.IsExpired(nil) {
-				c.remove(key)
-			}
+			//if item.IsExpired(nil) {
+			//	c.remove(key)
+			//}
 		}
 		return value, ok
 	}
@@ -719,4 +1025,18 @@ func (c *SimpleOrderedCache) removeExpired(allowFailCount int) error {
 	}
 	c.removeKeysByIndex(removedIndex)
 	return nil
+}
+
+//for test
+func (c *SimpleOrderedCache) PrintValues(stamp int) {
+	keys, values := c.GetKeysAndValues()
+	fmt.Println("total  , key, value", len(keys), len(values))
+	for i, key := range keys {
+		if i%stamp == 0 {
+			if i >= len(values) {
+				fmt.Println("key ", key)
+			}
+			fmt.Println("key  value ", key, values[i])
+		}
+	}
 }

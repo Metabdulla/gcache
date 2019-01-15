@@ -7,14 +7,16 @@ import (
 	"time"
 )
 
-func newtestSimploOrderCache() *SimpleOrderedCache {
-	c := New(50000).Simple().Expiration(time.Second * 10).BuildOrderedCache()
+func newtestSimploOrderCache( serachFunc  SearchCompareFunction) *SimpleOrderedCache {
+	DebugMode = true
+	c := New(100000).Simple().Expiration(time.Second * 10).SearchFunc(serachFunc).BuildOrderedCache()
 	return c.(*SimpleOrderedCache)
 
 }
 
+
 func TestSimpleOrderedCache_Remove(t *testing.T) {
-	c := newtestSimploOrderCache()
+	c := newtestSimploOrderCache(nil)
 	for i := 0; i < 1000; i++ {
 		c.EnQueue(i, fmt.Sprintf("%d", i))
 	}
@@ -30,7 +32,7 @@ func TestSimpleOrderedCache_Remove(t *testing.T) {
 }
 
 func TestSimpleOrderedCache_EnQueueBatch(t *testing.T) {
-	c := newtestSimploOrderCache()
+	c := newtestSimploOrderCache(nil)
 	for i := 0; i < 100; i++ {
 		c.EnQueue(i, fmt.Sprintf("%d", i))
 	}
@@ -63,7 +65,7 @@ func TestSimpleOrderedCache_EnQueueBatch(t *testing.T) {
 }
 
 func TestRemoveByIndex(t *testing.T) {
-	c := newtestSimploOrderCache()
+	c := newtestSimploOrderCache(nil)
 	var index []int
 	for i := 0; i < 100; i++ {
 		c.orderedKeys = append(c.orderedKeys, i)
@@ -77,7 +79,7 @@ func TestRemoveByIndex(t *testing.T) {
 
 
 func TestSimpleOrderedCache_MoveFront(t *testing.T) {
-	c := newtestSimploOrderCache()
+	c := newtestSimploOrderCache(nil)
 	for i := 0; i < 100; i++ {
 		val:= fmt.Sprintf("I%d",i)
 		c.EnQueue(i,val)
@@ -89,7 +91,7 @@ func TestSimpleOrderedCache_MoveFront(t *testing.T) {
 }
 
 func TestSimpleOrderedCache_GetKeysAndValues(t *testing.T) {
-	c := newtestSimploOrderCache()
+	c := newtestSimploOrderCache(nil	)
 	for i := 0; i < 20; i++ {
 		val:= fmt.Sprintf("I%d",i)
 		c.EnQueue(i,val)
@@ -100,7 +102,7 @@ func TestSimpleOrderedCache_GetKeysAndValues(t *testing.T) {
 }
 
 func TestSimpleOrderedCache_AddFront(t *testing.T) {
-	c := newtestSimploOrderCache()
+	c := newtestSimploOrderCache(nil)
 	for i := 0; i < 20; i++ {
 		val:= fmt.Sprintf("I%d",i)
 		c.EnQueue(i,val)
@@ -112,7 +114,7 @@ func TestSimpleOrderedCache_AddFront(t *testing.T) {
 }
 
 func TestSimpleOrderedCache_AddFrontBatch(t *testing.T) {
-	c := newtestSimploOrderCache()
+	c := newtestSimploOrderCache(nil	)
 	for i := 0; i < 20; i++ {
 		val:= fmt.Sprintf("I%d",i)
 		c.EnQueue(i,val)
@@ -121,4 +123,158 @@ func TestSimpleOrderedCache_AddFrontBatch(t *testing.T) {
 	keys,values:= c.GetKeysAndValues()
 	fmt.Println(keys)
 	fmt.Println(values)
+}
+
+func cmpInt (x interface{} ,y interface{} ) int {
+	a:=x.(int)
+	b:=y.(int)
+	if a > b {
+		return 1
+	}else if a <b {
+		return -1
+	}
+	return 0
+}
+
+
+
+func TestSimpleCache_EnqueueWithOrder(t *testing.T) {
+	fmt.Println(cmpInt(5,3))
+	c := newtestSimploOrderCache(cmpInt	)
+	for i := 0; i < 10; i++ {
+		val:= 3*i+1
+		//insert at the end
+		c.EnQueue(i,val)
+	}
+	c.PrintValues(1)
+	//insert in the middle
+	c.EnQueue(21,23)
+	c.PrintValues(1)
+	//insert at the front
+	c.EnQueue(-1,-3)
+	c.PrintValues(1)
+
+}
+
+
+func TestSimpleCache_BatchEnqueueWithOrder(t *testing.T) {
+
+	fmt.Println(cmpInt(5,3))
+	c := newtestSimploOrderCache(cmpInt	)
+	for i := 0; i < 20; i=i+2 {
+		val:= 3*i+1
+		//insert at the end
+		c.EnQueue(i,val)
+	}
+	c.PrintValues(1)
+	//insert at  the front
+	c.EnQueueBatch([]interface{}{101,102,103},[]interface{}{-4*3+1,-2*3+1,-1*3+1})
+	c.PrintValues(1)
+	//insert at the end
+	c.EnQueueBatch([]interface{}{80,81,82},[]interface{}{102*3+1,103*3+1,104*3+1})
+	c.PrintValues(1)
+
+	//insert in the middle
+	c.EnQueueBatch([]interface{}{30,31,32,33,34,35,36},[]interface{}{8*3+1,12*3+1,12*3+1,13*3,15*3+1,15*3+1,17*3+1})
+	c.PrintValues(1)
+
+}
+
+func TestSimpleCache_BatchAddFrontWithOrder(t *testing.T) {
+
+	fmt.Println(cmpInt(5,3))
+	c := newtestSimploOrderCache(cmpInt	)
+	for i := 0; i < 20; i=i+2 {
+		val:= 3*i+1
+		//insert at the end
+		c.EnQueue(i,val)
+	}
+	c.PrintValues(1)
+	c.orderedKeys = append(c.orderedKeys,54,55)
+	SliceInsert(c.orderedKeys,0,56)
+	SliceInsert(c.orderedKeys,0,57)
+	//insert at  the front
+	c.PrependBatch([]interface{}{101,102,103},[]interface{}{-4*3+1,-2*3+1,-1*3+1})
+	c.PrintValues(1)
+	c.orderedKeys = append(c.orderedKeys,58,59)
+	SliceInsert(c.orderedKeys,0,567)
+	SliceInsert(c.orderedKeys,0,577)
+	//insert at the end
+	c.PrependBatch([]interface{}{80,81,82},[]interface{}{102*3+1,103*3+1,104*3+1})
+	c.PrintValues(1)
+
+	//insert in the middle
+	c.orderedKeys = append(c.orderedKeys,50,51)
+	SliceInsert(c.orderedKeys,0,52)
+	SliceInsert(c.orderedKeys,0,53)
+	c.PrependBatch([]interface{}{30,31,32,33,34,35,36},[]interface{}{8*3+1,12*3+1,12*3+1,13*3,15*3+1,15*3+1,17*3+1})
+	c.PrintValues(1)
+	c.EnQueueBatch([]interface{}{40},[]interface{}{30})
+	c.PrintValues(1)
+}
+
+func TestSimpleCache_WithOrder(t *testing.T) {
+	c := newtestSimploOrderCache(cmpInt	)
+	for i := 10000; i < 30000; i=i+2 {
+		val:= 3*i+1
+		//insert at the end
+		c.EnQueue(i,val)
+	}
+	var  smallSlicekey []interface{}
+	var smallSliceVal []interface{}
+	for i := 2800; i < 4100; i=i+2 {
+		smallSlicekey = append(smallSlicekey,i)
+		var val int
+		if i%5==0 {
+			val = i*10
+		}else {
+			val = i*10+1
+		}
+		if i>4000 {
+			val = 60000+i
+		}
+		if i> 4050 {
+			val = 80000+i*11
+		}
+		//insert at the end
+		smallSliceVal = append(smallSliceVal,val)
+	}
+	c.PrintValues(400)
+	start:=time.Now()
+	c.PrependBatch(smallSlicekey,smallSliceVal)
+	fmt.Println("ued time ",time.Now().Sub(start))
+	c.PrintValues(300)
+}
+
+
+func TestSimpleCache_Remove(t *testing.T) {
+	c := newtestSimploOrderCache(cmpInt	)
+	var oldValue int
+	for i := 10000; i < 40000; i=i+2 {
+		var value int
+		if i%8==0 {
+			value = 3*i+1
+			oldValue = value
+		}else {
+			value = oldValue
+		}
+		//insert at the end
+		c.EnQueue(i,value)
+		if i<=10000+30 {
+			fmt.Print(" i ",i,value," v ")
+			if i==10000+30{
+				fmt.Println("")
+			}
+		}
+	}
+	c.PrintValues(900)
+	start:=time.Now()
+	c.Remove(23204)
+	fmt.Println("ued time for sorted remove",time.Now().Sub(start))
+	c.PrintValues(800)
+	start =time.Now()
+	c.searchFunc =nil
+	c.Remove(23206)
+	fmt.Println("ued time for remove",time.Now().Sub(start))
+	c.PrintValues(800)
 }
