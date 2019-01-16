@@ -200,6 +200,9 @@ func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}
 	if c.searchCmpFunc == nil {
 		panic("index func is nil")
 	}
+	if len(keys) ==0 {
+		return
+	}
 	if suggestedAt < 0 || suggestedAt > len(c.orderedKeys) || len(keys) != len(values) {
 		panic(fmt.Sprintf("suggestedAt %d out of range ,len: %d, len keys %d, len values:%d",
 			suggestedAt, len(c.orderedKeys), len(keys), len(values)))
@@ -296,6 +299,9 @@ func (c *SimpleOrderedCache) insertKey(key interface{}, value interface{}, sugge
 	}
 	if len(c.orderedKeys) == 0 {
 		c.orderedKeys = append(c.orderedKeys, key)
+		return
+	}
+	if key ==nil {
 		return
 	}
 	if suggestedAt < 0 || suggestedAt > len(c.orderedKeys) {
