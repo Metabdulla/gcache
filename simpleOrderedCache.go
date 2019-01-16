@@ -226,6 +226,7 @@ func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}
 			}
 			break
 		}
+		//may be expired
 		first++
 		if first == len(c.orderedKeys) {
 			c.orderedKeys = keys
@@ -249,7 +250,7 @@ func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}
 			break
 		}
 		last--
-		if first == len(c.orderedKeys) {
+		if last  < 0 {
 			c.orderedKeys = keys
 			return
 		}
