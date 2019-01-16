@@ -55,6 +55,7 @@ type OrderedCache interface {
 	GetKeysAndValues() ([]interface{}, []interface{})
 	get(interface{}, bool) (interface{}, error)
 	Remove(interface{}) bool
+	PrintValues(int)
 	Purge()
 	Refresh()
 	Keys() []interface{}
@@ -77,7 +78,7 @@ type baseCache struct {
 	mu               sync.RWMutex
 	loadGroup        Group
 	sortKeysFunc	SortKeysFunction
-	searchFunc       SearchCompareFunction
+	searchCmpFunc       SearchCompareFunction
 	*stats
 }
 
@@ -107,7 +108,7 @@ type CacheBuilder struct {
 	serializeFunc    SerializeFunc
 	expireFunction   ExpiredFunction
 	sortKeysFunction  SortKeysFunction
-	searchFunc        SearchCompareFunction
+	searchCmpFunc        SearchCompareFunction
 }
 
 // using ordered cache if orderedcache  is true
@@ -199,8 +200,8 @@ func (cb *CacheBuilder) SortKeysFunc(sortKeysFunction SortKeysFunction) *CacheBu
 }
 
 
-func (cb *CacheBuilder) SearchFunc( searchFunction  SearchCompareFunction) *CacheBuilder {
-	cb.searchFunc = searchFunction
+func (cb *CacheBuilder) SearchCompareFunction( searchFunction  SearchCompareFunction) *CacheBuilder {
+	cb.searchCmpFunc = searchFunction
 	return cb
 }
 
@@ -264,7 +265,7 @@ func buildCache(c *baseCache, cb *CacheBuilder) {
 	c.purgeVisitorFunc = cb.purgeVisitorFunc
 	c.expireFunction = cb.expireFunction
 	c.sortKeysFunc = cb.sortKeysFunction
-	c.searchFunc =  cb.searchFunc
+	c.searchCmpFunc =  cb.searchCmpFunc
 	c.stats = &stats{}
 }
 

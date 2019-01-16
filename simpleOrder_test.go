@@ -9,7 +9,7 @@ import (
 
 func newtestSimploOrderCache( serachFunc  SearchCompareFunction) *SimpleOrderedCache {
 	DebugMode = true
-	c := New(100000).Simple().Expiration(time.Second * 10).SearchFunc(serachFunc).BuildOrderedCache()
+	c := New(100000).Simple().Expiration(time.Second * 10).SearchCompareFunction(serachFunc).BuildOrderedCache()
 	return c.(*SimpleOrderedCache)
 
 }
@@ -273,8 +273,64 @@ func TestSimpleCache_Remove(t *testing.T) {
 	fmt.Println("ued time for sorted remove",time.Now().Sub(start))
 	c.PrintValues(800)
 	start =time.Now()
-	c.searchFunc =nil
+	c.searchCmpFunc =nil
 	c.Remove(23206)
 	fmt.Println("ued time for remove",time.Now().Sub(start))
 	c.PrintValues(800)
+}
+
+func TestSimpleCache_Sort(t *testing.T) {
+	type element struct {
+		height  int
+		weight int
+	}
+	f:= func (x interface{} , y interface{})int {
+		e:= x.(element)
+		e2:=y.(element)
+		if e.weight>e2.weight {
+			return 1
+		}else if e.weight<e2.weight {
+			return -1
+		}
+		return 0
+	}
+	c := newtestSimploOrderCache(f)
+	for i:=0; i<100;i++ {
+		var e element
+		if i%40 == 0 {
+			e.height = i / 10
+			e.weight = int(i%100) + e.height
+		} else {
+			e.height = i / 10
+			e.weight = int(i%10) + e.height
+		}
+		fmt.Print(e,"" ,i)
+		err := c.EnQueue(i,e)
+		if err != nil {
+			panic(err)
+		}
+	}
+	c.PrintValues(1)
+		//fmt.Pr
+}
+
+
+func TestRemoveLastItem(t *testing.T){
+	c :=newtestSimploOrderCache(cmpInt)
+	var oldVal  int
+	for i:=0;i<10;i++ {
+		var val int
+		if i%3==0 {
+			val = i*2
+			oldVal = val
+		}else {
+			val = oldVal
+		}
+		c.EnQueue(i,val)
+	}
+	c.PrintValues(1)
+	fmt.Println(c.Get(9))
+	c.Remove(9)
+	fmt.Println(c.Get(9))
+	c.PrintValues(1)
 }

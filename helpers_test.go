@@ -344,3 +344,17 @@ func TestSliceInsert2(t *testing.T) {
 	//insert 4  used  420ms 1000001
 }
 
+func TestSearch2(t *testing.T) {
+	var arrs =[]int {1,2,3,4,5,6,6,6,7,7,7,8,8,8,9,9,9,9,10}
+	x:=10
+	f:=func (i int )bool {
+		if arrs[i] >=x {
+			return true
+		}
+		return false
+	}
+	i:= Search(len(arrs),f)
+	fmt.Println(i,arrs[i],x,arrs[i-1],len(arrs))
+
+}
+
