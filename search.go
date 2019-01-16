@@ -5,6 +5,13 @@ import "fmt"
 var DebugMode bool
 
 
+func Debug(args...interface{}) {
+	if !DebugMode {
+		return
+	}
+	fmt.Println(args)
+}
+
 func Search(n int, f func(int) bool) int {
 	var depth = 0
 	// Define f(-1) == false and f(n) == true.

@@ -204,7 +204,6 @@ func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}
 		panic(fmt.Sprintf("suggestedAt %d out of range ,len: %d, len keys %d, len values:%d",
 			suggestedAt, len(c.orderedKeys), len(keys), len(values)))
 	}
-	fmt.Println(c.orderedKeys, "here")
 	if len(c.orderedKeys) == 0 {
 		c.orderedKeys = keys
 		return
@@ -290,7 +289,7 @@ func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}
 }
 
 func (c *SimpleOrderedCache) insertKey(key interface{}, value interface{}, suggestedAt int) {
-	//defer fmt.Println(c.orderedKeys ,key,value,suggestedAt)
+	//defer Debug(c.orderedKeys ,key,value,suggestedAt)
 	if c.searchCmpFunc == nil {
 		panic("searchCmp function func is nil")
 	}
@@ -329,9 +328,8 @@ func (c *SimpleOrderedCache) insertKey(key interface{}, value interface{}, sugge
 		//todo
 	}
 	i := c.search(value)
-	//fmt.Println(i)
 	c.orderedKeys = SliceInsert(c.orderedKeys, i, key)
-	//fmt.Println(c.orderedKeys)
+
 	return
 }
 
@@ -623,9 +621,8 @@ func (c *SimpleOrderedCache)delete(key interface{}) bool {
 			j := i
 			for ; j < len(c.orderedKeys); j++ {
 				if c.orderedKeys[j] == key {
-					if  DebugMode {
-						fmt.Println("found key at index i , the key is  ", i, c.orderedKeys[i], j, c.orderedKeys[j])
-					}
+						Debug("found key at index i , the key is  ", i, c.orderedKeys[i], j, c.orderedKeys[j])
+
 					c.orderedKeys = append(c.orderedKeys[:j], c.orderedKeys[j+1:]...)
 					found = true
 					break
@@ -637,13 +634,13 @@ func (c *SimpleOrderedCache)delete(key interface{}) bool {
 					}
 				}
 			}
-			if !found && DebugMode {
+			if !found  {
 				if i >= len(c.orderedKeys) {
-					fmt.Println("not found key i, j",i,j)
+					Debug("not found key i, j",i,j)
 				} else if j >= len(c.orderedKeys){
-					fmt.Println("not found key i, j",i,c.orderedKeys[i])
+					Debug("not found key i, j",i,c.orderedKeys[i])
 				} else{
-					fmt.Println("not found key at index i , the key is  ", i, c.orderedKeys[i], j, c.orderedKeys[j])
+					Debug("not found key at index i , the key is  ", i, c.orderedKeys[i], j, c.orderedKeys[j])
 				}
 			}
 
@@ -656,9 +653,7 @@ func (c *SimpleOrderedCache)delete(key interface{}) bool {
 				}
 				j= i
 			}
-			if DebugMode {
-				fmt.Println("cmp times ", j)
-			}
+			Debug("cmp times ", j)
 		}
 	}
 	ok = c.deleteVal(key)
