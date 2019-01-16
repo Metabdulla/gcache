@@ -488,15 +488,14 @@ func (c *SimpleOrderedCache) evict(count int) {
 	var removedKeys []int
 	for i := 0; i < len(c.orderedKeys); i++ {
 		if current >= count || fail > 3*count {
-			c.removeKeysByIndex(removedKeys)
-			return
+			break
 		}
 		key := c.orderedKeys[i]
 		item, ok := c.items[key]
 		if ok {
 			if item.expiration == nil || now.After(*item.expiration) ||
 				(c.expireFunction != nil && c.expireFunction(key)) {
-				defer c.delete(key)
+				defer c.deleteVal(key)
 				removedKeys = append(removedKeys, i)
 				current++
 			} else {
@@ -507,7 +506,7 @@ func (c *SimpleOrderedCache) evict(count int) {
 			current++
 		}
 	}
-
+	c.removeKeysByIndex(removedKeys)
 }
 
 //insert a small slice into a big slice with order
@@ -890,7 +889,7 @@ func (c *SimpleOrderedCache) deQueueBatch(count int) (keys []interface{}, values
 			current++
 		}
 		removedIndex = append(removedIndex, i)
-		c.remove(key)
+		c.deleteVal(key)
 	}
 	if all {
 		c.init()
@@ -915,10 +914,10 @@ func (c *SimpleOrderedCache) deQueue() (key interface{}, value interface{}, err 
 		item, ok := c.items[key]
 		if ok {
 			value = item.value
-			c.remove(key)
+			c.deleteVal(key)
 			break
 		}
-		c.remove(key)
+		c.deleteVal(key)
 	}
 	c.removeKeysByIndex(removedIndex)
 	c.mu.Unlock()
