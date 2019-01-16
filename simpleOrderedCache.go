@@ -611,6 +611,11 @@ func (c*SimpleOrderedCache)searchFrom (to ,from int , value interface{}) int {
 func (c *SimpleOrderedCache) Remove(key interface{}) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.delete(key)
+}
+
+
+func (c *SimpleOrderedCache)delete(key interface{}) bool {
 	item, ok  := c.items[key]
 	if ok {
 		if c.searchCmpFunc != nil {
@@ -633,7 +638,7 @@ func (c *SimpleOrderedCache) Remove(key interface{}) bool {
 					}
 				}
 			}
-			 if !found && DebugMode {
+			if !found && DebugMode {
 				if i >= len(c.orderedKeys) {
 					fmt.Println("not found key i, j",i,j)
 				} else if j >= len(c.orderedKeys){
@@ -657,7 +662,7 @@ func (c *SimpleOrderedCache) Remove(key interface{}) bool {
 			}
 		}
 	}
-	ok =c.remove(key)
+	ok = c.deleteVal(key)
 	if len(c.items) == 0 {
 		c.orderedKeys = nil
 	} else if len(c.items) == 1 {
@@ -666,10 +671,10 @@ func (c *SimpleOrderedCache) Remove(key interface{}) bool {
 			c.orderedKeys = append(c.orderedKeys, k)
 		}
 	}
-	return ok
+	return  ok
 }
 
-func (c *SimpleOrderedCache) remove(key interface{}) bool {
+func (c *SimpleOrderedCache) deleteVal(key interface{}) bool {
 	item, ok := c.items[key]
 	if ok {
 		delete(c.items, key)
@@ -821,7 +826,7 @@ func (c *SimpleOrderedCache) getALl() (keys []interface{}, values []interface{})
 				//c.stats.IncrHitCount()
 			} else {
 				index = append(index, i)
-				c.remove(key)
+				c.delete(key)
 			}
 		} else {
 			//c.stats.IncrMissCount()
@@ -843,12 +848,12 @@ func (c *SimpleOrderedCache) getTop() (key interface{}, value interface{}, err e
 			value = item.value
 			if item.IsExpired(nil) {
 				removedIndex = append(removedIndex, i)
-				c.remove(key)
+				c.deleteVal(key)
 			}
 			break
 		}
 		removedIndex = append(removedIndex, i)
-		c.remove(key)
+		c.deleteVal(key)
 	}
 	c.removeKeysByIndex(removedIndex)
 	c.mu.Unlock()
@@ -974,16 +979,16 @@ func (c *SimpleOrderedCache) Sort() {
 		item, ok := c.items[key]
 		if ok {
 			value = item.value
-			//if item.IsExpired(nil) {
-			//	c.remove(key)
-			//}
+			if item.IsExpired(nil) {
+				c.delete(key)
+			}
 		}
 		return value, ok
 	}
 	var values []interface{}
 	for key, item := range c.items {
 		if item.IsExpired(nil) {
-			c.remove(key)
+			c.delete(key)
 		}
 		values = append(values, item.value)
 	}
@@ -1004,19 +1009,19 @@ func (c *SimpleOrderedCache) removeExpired(allowFailCount int) error {
 		if ok {
 			if item.IsExpired(nil) {
 				removedIndex = append(removedIndex, i)
-				c.remove(key)
+				c.deleteVal(key)
 				continue
 			}
 			if c.expireFunction != nil {
 				if c.expireFunction(key) {
 					removedIndex = append(removedIndex, i)
-					c.remove(key)
+					c.deleteVal(key)
 					continue
 				}
 			}
 			try++
 		}
-		c.remove(key)
+		c.deleteVal(key)
 	}
 	c.removeKeysByIndex(removedIndex)
 	return nil
