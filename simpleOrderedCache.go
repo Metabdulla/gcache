@@ -446,7 +446,7 @@ func (c *SimpleOrderedCache) getValue(key interface{}, onLoad bool) (interface{}
 			return v, nil
 		}
 		//todo remove ordered key
-		c.remove(key)
+		c.delete(key)
 	}
 	c.mu.Unlock()
 	if !onLoad {
@@ -496,7 +496,7 @@ func (c *SimpleOrderedCache) evict(count int) {
 		if ok {
 			if item.expiration == nil || now.After(*item.expiration) ||
 				(c.expireFunction != nil && c.expireFunction(key)) {
-				defer c.remove(key)
+				defer c.delete(key)
 				removedKeys = append(removedKeys, i)
 				current++
 			} else {
