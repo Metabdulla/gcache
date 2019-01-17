@@ -236,6 +236,7 @@ func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}
 		first++
 		if first == len(c.orderedKeys) {
 			c.orderedKeys = keys
+			log.WithField("keys",keys).WithField("orderedkeys ",len(c.orderedKeys)).Trace("append keys to front")
 			return
 		}
 	}
@@ -587,7 +588,7 @@ func (c *SimpleOrderedCache) removeKeysByIndex(indexes []int) {
 		first = second
 	}
 	c.orderedKeys = append(c.orderedKeys, oldKeys[end+1:]...)
-	log.WithFields(log.Fields{"indexes":indexes,"ordered keys ": c.orderedKeys}).Trace("after remove indexes")
+	log.WithFields(log.Fields{"indexes":indexes,"ordered keys ": len(c.orderedKeys)}).Trace("after remove indexes")
 }
 
 func (c*SimpleOrderedCache)search(value interface{}) int {
