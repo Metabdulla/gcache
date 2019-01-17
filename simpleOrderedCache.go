@@ -2,6 +2,7 @@ package gcache
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -197,6 +198,7 @@ func (c *SimpleOrderedCache) enQueueBatch(keys []interface{}, values []interface
 
 //insertKeys  required  keys and values are sorted , otherwise never call this function
 func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}, suggestedAt int) {
+	log.WithFields(log.Fields{"key":keys,"values":values,"ordered keys ": c.orderedKeys, "suggestedAt":suggestedAt}).Trace("before insert keys")
 	if c.searchCmpFunc == nil {
 		panic("index func is nil")
 	}
@@ -289,11 +291,12 @@ func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}
 	}
 	//then insert the values
 	c.insertKeysByIndex(insertIndex, keys)
+	log.WithFields(log.Fields{"key":keys,"values":values,"ordered keys ": c.orderedKeys, "suggestedAt":suggestedAt}).Trace("after insert keys")
 	return
 }
 
 func (c *SimpleOrderedCache) insertKey(key interface{}, value interface{}, suggestedAt int) {
-	//defer Debug(c.orderedKeys ,key,value,suggestedAt)
+	log.WithFields(log.Fields{"key":key,"values":value,"ordered keys ": c.orderedKeys, "suggestedAt":suggestedAt}).Trace("before insert key")
 	if c.searchCmpFunc == nil {
 		panic("searchCmp function func is nil")
 	}
@@ -336,7 +339,7 @@ func (c *SimpleOrderedCache) insertKey(key interface{}, value interface{}, sugge
 	}
 	i := c.search(value)
 	c.orderedKeys = SliceInsert(c.orderedKeys, i, key)
-
+	log.WithFields(log.Fields{"key":key,"values":value,"ordered keys ": c.orderedKeys, "suggestedAt":suggestedAt}).Trace("before insert key")
 	return
 }
 
@@ -553,6 +556,7 @@ func (c *SimpleOrderedCache) insertKeysByIndex(indexes []int, keys []interface{}
 //removeKeysByIndex
 //[][][][][remove][remove][]
 func (c *SimpleOrderedCache) removeKeysByIndex(indexes []int) {
+	log.WithFields(log.Fields{"removed indexes":indexes,"ordered keys ": c.orderedKeys}).Trace("before  remove indexes")
 	if len(indexes) == 0 {
 		return
 	}
@@ -579,6 +583,7 @@ func (c *SimpleOrderedCache) removeKeysByIndex(indexes []int) {
 		first = second
 	}
 	c.orderedKeys = append(c.orderedKeys, oldKeys[end+1:]...)
+	log.WithFields(log.Fields{"indexes":indexes,"ordered keys ": c.orderedKeys}).Trace("after remove indexes")
 }
 
 func (c*SimpleOrderedCache)search(value interface{}) int {
@@ -620,6 +625,7 @@ func (c *SimpleOrderedCache) Remove(key interface{}) bool {
 
 
 func (c *SimpleOrderedCache)delete(key interface{}) bool {
+	log.Tracef("item will be deleted %v",key)
 	item, ok  := c.items[key]
 	if ok {
 		if c.searchCmpFunc != nil {
@@ -628,8 +634,7 @@ func (c *SimpleOrderedCache)delete(key interface{}) bool {
 			j := i
 			for ; j < len(c.orderedKeys); j++ {
 				if c.orderedKeys[j] == key {
-						Debug("found key at index i , the key is  ", i, c.orderedKeys[i], j, c.orderedKeys[j])
-
+						log.Debugf("found key at index i %d , the key[i] %v ,j %d,,key [j] %v  ", i, c.orderedKeys[i], j, c.orderedKeys[j])
 					c.orderedKeys = append(c.orderedKeys[:j], c.orderedKeys[j+1:]...)
 					found = true
 					break
@@ -643,11 +648,11 @@ func (c *SimpleOrderedCache)delete(key interface{}) bool {
 			}
 			if !found  {
 				if i >= len(c.orderedKeys) {
-					Debug("not found key i, j",i,j)
+					log.Debugf("not found key i %d , j %d",i,j)
 				} else if j >= len(c.orderedKeys){
-					Debug("not found key i, j",i,c.orderedKeys[i])
+					log.Debugf("not found key i %d, j %d, key[i] %v",i,j ,c.orderedKeys[i])
 				} else{
-					Debug("not found key at index i , the key is  ", i, c.orderedKeys[i], j, c.orderedKeys[j])
+					log.Debugf(" not found key at index i %d , the key[i] %v ,j %d,,key [j] %v  ", i, c.orderedKeys[i], j, c.orderedKeys[j])
 				}
 			}
 
@@ -660,7 +665,7 @@ func (c *SimpleOrderedCache)delete(key interface{}) bool {
 				}
 				j= i
 			}
-			Debug("cmp times ", j)
+			log.Debugf("cmp times %d ", j)
 		}
 	}
 	ok = c.deleteVal(key)
@@ -827,7 +832,8 @@ func (c *SimpleOrderedCache) getALl() (keys []interface{}, values []interface{})
 				//c.stats.IncrHitCount()
 			} else {
 				index = append(index, i)
-				c.delete(key)
+				log.Debugf("expired value will be removed %v %v",key ,item.value)
+				c.deleteVal(key)
 			}
 		} else {
 			//c.stats.IncrMissCount()
@@ -849,11 +855,13 @@ func (c *SimpleOrderedCache) getTop() (key interface{}, value interface{}, err e
 			value = item.value
 			if item.IsExpired(nil) {
 				removedIndex = append(removedIndex, i)
+				log.Debugf("expired value will be removed %v %v",key ,item.value)
 				c.deleteVal(key)
 			}
 			break
 		}
 		removedIndex = append(removedIndex, i)
+		log.Debugf("expired value will be removed %v ",key)
 		c.deleteVal(key)
 	}
 	c.removeKeysByIndex(removedIndex)
@@ -894,6 +902,7 @@ func (c *SimpleOrderedCache) deQueueBatch(count int) (keys []interface{}, values
 		c.deleteVal(key)
 	}
 	if all {
+		log.Debugf("init cache , removed all")
 		c.init()
 	} else {
 		c.removeKeysByIndex(removedIndex)
@@ -981,6 +990,7 @@ func (c *SimpleOrderedCache) Sort() {
 		if ok {
 			value = item.value
 			if item.IsExpired(nil) {
+				log.Debug("remove expired key %v, value %v",key,value)
 				c.delete(key)
 			}
 		}
