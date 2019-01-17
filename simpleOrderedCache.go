@@ -210,6 +210,7 @@ func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}
 			suggestedAt, len(c.orderedKeys), len(keys), len(values)))
 	}
 	if len(c.orderedKeys) == 0 {
+		log.Trace("ordered keys is nil ")
 		c.orderedKeys = keys
 		return
 	}
@@ -227,6 +228,7 @@ func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}
 			if c.searchCmpFunc(values[len(values)-1], item.value) <= 0 {
 				newKeys := keys
 				c.orderedKeys = append(newKeys, c.orderedKeys[first:]...)
+				log.WithField("orderedkeys ",c.orderedKeys).Trace("append keys to front")
 				return
 			}
 			break
@@ -250,6 +252,7 @@ func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}
 					c.orderedKeys = append(c.orderedKeys[:last+1])
 				}
 				c.orderedKeys = append(c.orderedKeys, keys...)
+				log.WithField("orderedkeys ",c.orderedKeys).Trace("append keys to last")
 				return
 			}
 			break
@@ -257,6 +260,7 @@ func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}
 		last--
 		if last  < 0 {
 			c.orderedKeys = keys
+			log.WithField("orderedkeys ",c.orderedKeys).Trace("append keys to last")
 			return
 		}
 	}
@@ -302,6 +306,7 @@ func (c *SimpleOrderedCache) insertKey(key interface{}, value interface{}, sugge
 	}
 	if len(c.orderedKeys) == 0 {
 		c.orderedKeys = append(c.orderedKeys, key)
+		log.WithField("ordered ",c.orderedKeys).Trace("keys is nil")
 		return
 	}
 	if key ==nil {
@@ -320,6 +325,7 @@ func (c *SimpleOrderedCache) insertKey(key interface{}, value interface{}, sugge
 			//suggested at insert front
 			if c.searchCmpFunc(value, val) >= 0 {
 				c.orderedKeys = append(c.orderedKeys, key)
+				log.WithField("ordered ",c.orderedKeys).Trace("insert to end")
 				return
 			}
 		}
@@ -331,6 +337,7 @@ func (c *SimpleOrderedCache) insertKey(key interface{}, value interface{}, sugge
 			//suggested at insert front
 			if c.searchCmpFunc(value, val) <= 0 {
 				c.orderedKeys = append([]interface{}{key}, c.orderedKeys...)
+				log.WithField("ordered ",c.orderedKeys).Trace("insert to front")
 				return
 			}
 		}
