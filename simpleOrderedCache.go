@@ -1027,8 +1027,7 @@ func (c *SimpleOrderedCache) removeExpired(allowFailCount int) error {
 				removedIndex = append(removedIndex, i)
 				c.deleteVal(key)
 				continue
-			}
-			if c.expireFunction != nil {
+			} else if c.expireFunction != nil {
 				if c.expireFunction(key) {
 					removedIndex = append(removedIndex, i)
 					c.deleteVal(key)
@@ -1036,8 +1035,10 @@ func (c *SimpleOrderedCache) removeExpired(allowFailCount int) error {
 				}
 			}
 			try++
+		}else {
+			removedIndex = append(removedIndex, i)
+			c.deleteVal(key)
 		}
-		c.deleteVal(key)
 	}
 	c.removeKeysByIndex(removedIndex)
 	return nil
