@@ -198,7 +198,6 @@ func (c *SimpleOrderedCache) enQueueBatch(keys []interface{}, values []interface
 
 //insertKeys  required  keys and values are sorted , otherwise never call this function
 func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}, suggestedAt int) {
-	log.WithFields(log.Fields{"key":keys,"values":values,"ordered keys ": c.orderedKeys, "suggestedAt":suggestedAt}).Trace("before insert keys")
 	if c.searchCmpFunc == nil {
 		panic("index func is nil")
 	}
@@ -210,7 +209,7 @@ func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}
 			suggestedAt, len(c.orderedKeys), len(keys), len(values)))
 	}
 	if len(c.orderedKeys) == 0 {
-		log.Trace("ordered keys is nil ")
+		log.WithField("keys ",keys).Trace("ordered keys is nil ")
 		c.orderedKeys = keys
 		return
 	}
@@ -300,13 +299,12 @@ func (c *SimpleOrderedCache) insertKeys(keys []interface{}, values []interface{}
 }
 
 func (c *SimpleOrderedCache) insertKey(key interface{}, value interface{}, suggestedAt int) {
-	log.WithFields(log.Fields{"key":key,"values":value,"ordered keys ": c.orderedKeys, "suggestedAt":suggestedAt}).Trace("before insert key")
 	if c.searchCmpFunc == nil {
 		panic("searchCmp function func is nil")
 	}
 	if len(c.orderedKeys) == 0 {
 		c.orderedKeys = append(c.orderedKeys, key)
-		log.WithField("ordered ",c.orderedKeys).Trace("keys is nil")
+		log.WithField("ordered ",c.orderedKeys).Trace("ordered keys is nil")
 		return
 	}
 	if key ==nil {
